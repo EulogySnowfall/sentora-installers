@@ -79,8 +79,8 @@ ARCH=$(uname -m)
 echo "Detected : $OS  $VER  $ARCH"
 
 if [[ "$OS" = "CentOs" && ("$VER" = "6" || "$VER" = "7" ) || 
-      "$OS" = "Ubuntu" && ("$VER" = "14.04" || "$VER" = "16.04" ) || 
-	  "$OS" = "Fedora" && ("$VER" = "24" || "$VER" = "25" ) || 
+      "$OS" = "Ubuntu" && ("$VER" = "14.04" || "$VER" = "16.04" || "$VER" = "18.04" ) ||
+	  "$OS" = "Fedora" && (( $(echo $VER >= 24 | bc -l) )) || 
       "$OS" = "debian" && ("$VER" = "7" || "$VER" = "8" ) ]] ; then
     echo "Ok."
 else
@@ -548,7 +548,7 @@ elif [[ "$OS" = "Ubuntu" || "$OS" = "debian" ]]; then
     rm -rf "/etc/apt/sources.list/*"
     cp "/etc/apt/sources.list" "/etc/apt/sources.list.save"
 
-    if [[ "$VER" == "14.04" || "$VER" == "16.04" ]]; then
+    if [[ "$VER" == "14.04" || "$VER" == "16.04"  || "$VER" == "18.04" ]]; then
         cat > /etc/apt/sources.list <<EOF
 #Depots main restricted
 deb http://archive.ubuntu.com/ubuntu $(lsb_release -sc) main restricted universe multiverse
@@ -884,7 +884,7 @@ elif [[ "$OS" = "Ubuntu" || "$OS" = "debian" ]]; then
     if [[ "$VER" = "12.04" || "$VER" = "7" ]]; then
         $PACKAGE_INSTALLER db4.7-util
     fi
-	if [[ "$VER" = "16.04" ]]; then
+	if (( $(echo "$VER >= 16.04" | bc -l) )) || (( $(echo "$VER == 8" | bc -l) )); then
 		MY_CNF_PATH="/etc/mysql/mysql.cnf"
 	else
 		MY_CNF_PATH="/etc/mysql/my.cnf"
@@ -892,11 +892,12 @@ elif [[ "$OS" = "Ubuntu" || "$OS" = "debian" ]]; then
     DB_SERVICE="mysql"
 fi
 
-if [[ "$VER" = "16.04" || "$VER" = "8" ]]; then
+if (( $(echo "$VER >= 16.04" | bc -l) )) || (( $(echo "$VER == 8" | bc -l) )); then
 	systemctl start $DB_SERVICE
 else
 	service $DB_SERVICE start
 fi
+
 
 mysqlversion=`mysql --version|awk '{ print $5 }'|awk -F\, '{ print $1 }'`
 patchroot="0"
@@ -904,7 +905,7 @@ patchroot="0"
 if [[ "$(versioncheck "$mysqlversion")" < "$(versioncheck "5.5.0")" ]]; then
 	echo -e "-- Your current Mysql Version installed is $mysqlversion."
 	echo -e "-- You don't need the user 'root' patch!"
-elif [[ "$VER" = "16.04" ]]; then
+elif (( $(echo "$VER >= 16.04" | bc -l) )); then
 	patchroot="1"
 else
 	while true; do	
@@ -933,7 +934,7 @@ fi
 
 # Bug fix under some MySQL 5.7+ about the sql_mode for "NO_ZERO_IN_DATE,NO_ZERO_DATE"
 # Need to be considere on the next .sql build query version.
-if [[ "$VER" == "16.04" ]]; then
+if [[ (( $(echo "$VER >= 16.04" | bc -l) )) ]]; then
 	# sed '/\[mysqld]/a\sql_mode = "NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION"' /etc/mysql/mysql.conf.d/mysqld.cnf
 	# sed 's/^\[mysqld\]/\[mysqld\]\sql_mode = "NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION"/' /etc/mysql/mysql.conf.d/mysqld.cnf
 	if ! grep -q "sql_mode" /etc/mysql/mysql.conf.d/mysqld.cnf; then
@@ -999,13 +1000,14 @@ echo -e "\n-- Installing Postfix"
 if [[ "$OS" = "CentOs" || "$OS" = "Fedora" ]]; then
 
     $PACKAGE_INSTALLER postfix postfix-perl-scripts
+
 	if [[ "$OS" = "Fedora" ]]; then
 		$PACKAGE_INSTALLER postfix-mysql
 	fi
     USR_LIB_PATH="/usr/libexec"
 elif [[ "$OS" = "Ubuntu" || "$OS" = "debian" ]]; then
-    $PACKAGE_INSTALLER postfix postfix-mysql
-    USR_LIB_PATH="/usr/lib"
+ $PACKAGE_INSTALLER postfix-mysql
+  USR_LIB_PATH="/usr/lib"
 fi
 
 postfixpassword=$(passwordgen);
@@ -1225,11 +1227,21 @@ if [[ "$OS" = "CentOs" || "$OS" = "Fedora" ]]; then
 		$PACKAGE_INSTALLER php php-devel php-gd php-mbstring php-intl php-mysqlnd php-xml php-xmlrpc
 	fi
     $PACKAGE_INSTALLER php-mcrypt php-imap  #Epel packages
+	
+	# Check the php version installed on the OS.
+	# phpver=php -v |grep -Eow '^PHP [^ ]+' |gawk '{ print $2 }'
+	phpver=`php -r 'echo PHP_VERSION;'`
+	PHPfv=${phpver:0:3};
+	echo -e "\n-- Your current php Version installed is $PHPfv"
+	
     PHP_INI_PATH="/etc/php.ini"
     PHP_EXT_PATH="/etc/php.d"
+	
+	
 elif [[ "$OS" = "Ubuntu" || "$OS" = "debian" ]]; then
-	if [[ "$VER" == "16.04" ]]; then
-		$PACKAGE_INSTALLER php php-dev php-mysql libapache2-mod-php php-common php-cli php-mysql php-gd php-mcrypt php-curl php-pear php-imap php-xmlrpc php7.0-xml php-intl php-mbstring mcrypt
+	if [[ "$VER" == "16.04" || "$VER" == "18.04" ]]; then
+		$PACKAGE_INSTALLER php php-dev php-mysql libapache2-mod-php php-common php-cli php-mysql php-gd php-curl php-pear php-xmlrpc php7.2-xml aptitude
+		$PACKAGE_INSTALLER  php7.2-mbstring
 	else
 		$PACKAGE_INSTALLER libapache2-mod-php5 php5-common php5-cli php5-mysql php5-gd php5-mcrypt php5-curl php-pear php5-imap php5-xmlrpc php5-xsl php5-intl
 	fi
@@ -1238,10 +1250,19 @@ elif [[ "$OS" = "Ubuntu" || "$OS" = "debian" ]]; then
     elif  [[ "$VER" == "12.04" || "$VER" == "7" ]]; then 
         $PACKAGE_INSTALLER php5-suhosin
     fi
-	if [[ "$VER" == "16.04" ]]; then
-		PHP_INI_PATH="/etc/php/7.0/apache2/php.ini"
-		PHP_EXT_PATH="/etc/php/7.0/mods-available/"
-		PHP_EXT_LINK="/etc/php/7.0/apache2/conf.d"
+	
+	# Check the php version installed on the OS.
+	# phpver=php -v |grep -Eow '^PHP [^ ]+' |gawk '{ print $2 }'
+	phpver=`php -r 'echo PHP_VERSION;'`
+	PHPfv=${phpver:0:3};
+	echo -e "\n-- Your current php Version installed is $PHPfv"
+	
+	
+	if [[ "$VER" == "16.04" || "$VER" == "18.04" ]]; then
+	    $PACKAGE_INSTALLER  php$PHPfv-mbstring php$PHPfv-xml
+		PHP_INI_PATH="/etc/php/$PHPfv/apache2/php.ini"
+		PHP_EXT_PATH="/etc/php/$PHPfv/mods-available/"
+		PHP_EXT_LINK="/etc/php/$PHPfv/apache2/conf.d"
 	else
 		PHP_INI_PATH="/etc/php5/apache2/php.ini"
 	fi
@@ -1271,82 +1292,77 @@ echo "session.save_path = $PANEL_DATA/sessions;">> $PHP_INI_PATH
 sed -i "s|;date.timezone =|date.timezone = $tz|" $PHP_INI_PATH
 sed -i "s|;upload_tmp_dir =|upload_tmp_dir = $PANEL_DATA/temp/|" $PHP_INI_PATH
 
-# Check the php version installed on the OS.
-# phpver=php -v |grep -Eow '^PHP [^ ]+' |gawk '{ print $2 }'
-phpver=`php -r 'echo PHP_VERSION;'`
-
-echo -e "\n-- Your current php Version installed is $phpver"
 
 # Disable php signature in headers to hide it from hackers
 sed -i "s|expose_php = On|expose_php = Off|" $PHP_INI_PATH
 
 
 # Build suhosin for PHP 5.x which is required by Sentora. 
-if [[ "$OS" = "CentOs" || "$OS" = "Fedora" || "$OS" = "debian" || ( "$OS" = "Ubuntu" && "$VER" != "12.04") ]] ; then
-    echo -e "\n# Building suhosin"
-    if [[ ("$OS" = "Ubuntu" && "$VER" != "16.04") || "$OS" = "debian" ]]; then
-        $PACKAGE_INSTALLER php5-dev
-    fi
-
-	while true; do
-	if [[ "$(versioncheck "$phpver")" < "$(versioncheck "7.0.0")" ]]; then
-		read -e -p "Do you want to install Suhosin from the Sentora (O)riginal version or the (l)ast stable version? (O/L)" suh
-	else
-		echo -e "-- Your current php Version installed is $phpver."
-		echo -e "-- Suhosin doesn't support the $phpver version."
-		echo -e "-- You can install Suhosin7 with php $phpver support."
-		echo -e "-- WARNING: Suhosin7 IS PRE-ALPHA SOFTWARE. DO NOT ATTEMPT TO RUN IN PRODUCTION."
-		read -e -p "Do you want to install Suhosin, Sentora (O)riginal, the (L)ast stable version or Suhosin7 Pre-(A)lpha for php 7.x? (O/L/A)" suh
-	fi
-		case $suh in
-			[Oo]* )
-				SUHOSIN_VERSION="0.9.37.1"
-				wget -nv -O suhosin.zip https://github.com/stefanesser/suhosin/archive/$SUHOSIN_VERSION.zip			
-			break;;
-			[Ll]* ) 
-				SUHOSIN_VERSION="0.9.38"
-				wget -nv -O suhosin.zip https://github.com/sektioneins/suhosin/archive/$SUHOSIN_VERSION.zip	
-			break;;
-			[Aa]* )
-				SUHOSIN_VERSION="master"
-				wget -nv -O suhosin.zip https://github.com/sektioneins/suhosin7/archive/$SUHOSIN_VERSION.zip
-			break;;
-		esac
-	done
-
-    unzip -q suhosin.zip
-    rm -f suhosin.zip
-	
-    if [[ "$SUHOSIN_VERSION" = "master" ]]; then
-		cd suhosin7-$SUHOSIN_VERSION
-	else
-		cd suhosin-$SUHOSIN_VERSION
-    fi
-	phpize &> /dev/null
-    ./configure &> /dev/null
-    make &> /dev/null
-    make install 
-    cd ..
-	if [[ "$SUHOSIN_VERSION" = "master" ]]; then
-		rm -rf suhosin7-$SUHOSIN_VERSION
-	else
-		rm -rf suhosin-$SUHOSIN_VERSION
-    fi
-   
-    if [[ "$OS" = "CentOs" || "$OS" = "Fedora" ]]; then 
-		if [[ "$SUHOSIN_VERSION" = "master" ]]; then
-			echo 'extension=suhosin7.so' > $PHP_EXT_PATH/suhosin.ini
-		else
-			echo 'extension=suhosin.so' > $PHP_EXT_PATH/suhosin.ini
-		fi 
-    elif [[ "$OS" = "Ubuntu" || "$OS" = "debian" ]]; then
-		if [[ "$SUHOSIN_VERSION" = "master" ]]; then
-			sed -i 'N;/default extension directory./a\extension=suhosin7.so' $PHP_INI_PATH
-		else
-			sed -i 'N;/default extension directory./a\extension=suhosin.so' $PHP_INI_PATH
-		fi
-    fi	
-fi
+#if [[ "$OS" = "CentOs" || "$OS" = "Fedora" || "$OS" = "debian" || ( "$OS" = "Ubuntu" && "$VER" != "12.04") ]] ; then
+#    echo -e "\n# Building suhosin"
+#    if [[ ("$OS" = "Ubuntu" && "$VER" < "16.04") || "$OS" = "debian" ]]; then
+#        $PACKAGE_INSTALLER php5-dev
+#    fi
+#
+#	while true; do
+#	if [[ "$(versioncheck "$phpver")" < "$(versioncheck "7.0.0")" ]]; then
+#		read -e -p "Do you want to install Suhosin from the Sentora (O)riginal version or the (l)ast stable version? (O/L)" suh
+#	else
+#		echo -e "-- Your current php Version installed is $phpver."
+#		echo -e "-- Suhosin doesn't support the $phpver version."
+#		echo -e "-- You can install Suhosin7 with php $phpver support."
+#		echo -e "-- WARNING: Suhosin7 IS PRE-ALPHA SOFTWARE. DO NOT ATTEMPT TO RUN IN PRODUCTION."
+#		read -e -p "Do you want to install Suhosin, Sentora (O)riginal, the (L)ast stable version or Suhosin7 Pre-(A)lpha for php 7.x? (O/L/A)" suh
+#	fi
+#		case $suh in
+#			[Oo]* )
+#				SUHOSIN_VERSION="0.9.37.1"
+#				wget -nv -O suhosin.zip https://github.com/stefanesser/suhosin/archive/$SUHOSIN_VERSION.zip			
+#			break;;
+#			[Ll]* ) 
+#				SUHOSIN_VERSION="0.9.38"
+#				wget -nv -O suhosin.zip https://github.com/sektioneins/suhosin/archive/$SUHOSIN_VERSION.zip	
+#			break;;
+#			[Aa]* )
+#				SUHOSIN_VERSION="master"
+#				wget -nv -O suhosin.zip https://github.com/sektioneins/suhosin7/archive/$SUHOSIN_VERSION.zip
+#			break;;
+#		esac
+#	done
+#
+#    unzip -q suhosin.zip
+#    rm -f suhosin.zip
+#
+#    if [[ "$SUHOSIN_VERSION" = "master" ]]; then
+#		cd suhosin7-$SUHOSIN_VERSION
+#	else
+#		cd suhosin-$SUHOSIN_VERSION
+#    fi
+#	phpize &> /dev/null
+#    ./configure &> /dev/null
+#    make &> /dev/null
+#    make install 
+#    cd ..
+#	if [[ "$SUHOSIN_VERSION" = "master" ]]; then
+#		rm -rf suhosin7-$SUHOSIN_VERSION
+#	else
+#		rm -rf suhosin-$SUHOSIN_VERSION
+#   fi
+#   
+#    if [[ "$OS" = "CentOs" || "$OS" = "Fedora" ]]; then 
+#		if [[ "$SUHOSIN_VERSION" = "master" ]]; then
+#			echo 'extension=suhosin7.so' > $PHP_EXT_PATH/suhosin.ini
+#		else
+#			echo 'extension=suhosin.so' > $PHP_EXT_PATH/suhosin.ini
+#		fi 
+#    elif [[ "$OS" = "Ubuntu" || "$OS" = "debian" ]]; then
+#		if [[ "$SUHOSIN_VERSION" = "master" ]]; then
+#			sed -i 'N;/default extension directory./a\extension=suhosin7.so' $PHP_INI_PATH
+#		else
+#			sed -i 'N;/default extension directory./a\extension=suhosin.so' $PHP_INI_PATH
+#		fi
+#   fi	
+#fi
 
 # Register apache(+php) service for autostart and start it
 if [[ "$OS" = "CentOs" || "$OS" = "Fedora" ]]; then
@@ -1659,7 +1675,7 @@ if [[ "$update_apps" == "1" ]]; then
 					elif [[ "$OS" = "Ubuntu" && "$VER" = "16.04" ]]; then
 						echo 'suhosin.session.encrypt=disabled' >> $PHP_EXT_PATH/suhosin.ini
 						ln -s $PHP_EXT_PATH/suhosin.ini $PHP_EXT_LINK/suhosin.ini
-					fi
+					fi 
 					if [[ "$VER" = "14.04" ]]; then
 						service $HTTP_SERVICE restart
 					else
@@ -1667,7 +1683,7 @@ if [[ "$update_apps" == "1" ]]; then
 					fi
 					mv  composer.json-dist composer.json
 					php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
-					php -r "if (hash_file('SHA384', 'composer-setup.php') === '669656bab3166a7aff8a7506b8cb2d1c292f042046c5a994c43155c0be6190fa0355160742ab2e1c88d40d5be660b410') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;"
+					# php -r "if (hash_file('SHA384', 'composer-setup.php') === '669656bab3166a7aff8a7506b8cb2d1c292f042046c5a994c43155c0be6190fa0355160742ab2e1c88d40d5be660b410') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;"
 					php composer-setup.php
 					php -r "unlink('composer-setup.php');"
 					php composer.phar install --no-dev
