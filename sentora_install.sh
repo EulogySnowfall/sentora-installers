@@ -1240,8 +1240,8 @@ if [[ "$OS" = "CentOs" || "$OS" = "Fedora" ]]; then
 	
 elif [[ "$OS" = "Ubuntu" || "$OS" = "debian" ]]; then
 	if [[ "$VER" == "16.04" || "$VER" == "18.04" ]]; then
-		$PACKAGE_INSTALLER php php-dev php-mysql libapache2-mod-php php-common php-cli php-mysql php-gd php-curl php-pear php-xmlrpc php7.2-xml aptitude
-		$PACKAGE_INSTALLER  php7.2-mbstring
+		$PACKAGE_INSTALLER php php-dev php-mysql libapache2-mod-php php-common php-cli php-mysql php-gd php-curl php-pear php-xmlrpc php$PHPfv-xml aptitude
+		$PACKAGE_INSTALLER  php$PHPfv-mbstring
 	else
 		$PACKAGE_INSTALLER libapache2-mod-php5 php5-common php5-cli php5-mysql php5-gd php5-mcrypt php5-curl php-pear php5-imap php5-xmlrpc php5-xsl php5-intl
 	fi
@@ -1259,7 +1259,6 @@ elif [[ "$OS" = "Ubuntu" || "$OS" = "debian" ]]; then
 	
 	
 	if [[ "$VER" == "16.04" || "$VER" == "18.04" ]]; then
-	    $PACKAGE_INSTALLER  php$PHPfv-mbstring php$PHPfv-xml
 		PHP_INI_PATH="/etc/php/$PHPfv/apache2/php.ini"
 		PHP_EXT_PATH="/etc/php/$PHPfv/mods-available/"
 		PHP_EXT_LINK="/etc/php/$PHPfv/apache2/conf.d"
