@@ -1006,7 +1006,7 @@ if [[ "$OS" = "CentOs" || "$OS" = "Fedora" ]]; then
 	fi
     USR_LIB_PATH="/usr/libexec"
 elif [[ "$OS" = "Ubuntu" || "$OS" = "debian" ]]; then
- $PACKAGE_INSTALLER postfix-mysql
+  $PACKAGE_INSTALLER postfix-mysql
   USR_LIB_PATH="/usr/lib"
 fi
 
@@ -1062,10 +1062,10 @@ sed -i '/smtpd_bind_address/d' $PANEL_CONF/postfix/master.cf
 if [[ "$OS" = "CentOs" || "$OS" = "Fedora" ]]; then
     if [[ "$VER" != "6" ]]; then
         systemctl enable postfix.service
-        # systemctl start postfix.service
+        systemctl restart postfix.service
     else
         chkconfig postfix on
-        # /etc/init.d/postfix start
+        /etc/init.d/postfix restart
     fi
 fi
 
@@ -1239,7 +1239,7 @@ if [[ "$OS" = "CentOs" || "$OS" = "Fedora" ]]; then
 	
 	
 elif [[ "$OS" = "Ubuntu" || "$OS" = "debian" ]]; then
-	if [[ "$VER" == "16.04" || "$VER" == "18.04" ]]; then
+	if (( $(echo "$VER >= 16.04" | bc -l) )); then
 		$PACKAGE_INSTALLER php php-dev php-mysql libapache2-mod-php php-common php-cli php-mysql php-gd php-curl php-pear php-xmlrpc php$PHPfv-xml aptitude
 		$PACKAGE_INSTALLER  php$PHPfv-mbstring
 	else
@@ -1258,7 +1258,7 @@ elif [[ "$OS" = "Ubuntu" || "$OS" = "debian" ]]; then
 	echo -e "\n-- Your current php Version installed is $PHPfv"
 	
 	
-	if [[ "$VER" == "16.04" || "$VER" == "18.04" ]]; then
+	if (( $(echo "$VER >= 16.04" | bc -l) )); then
 		PHP_INI_PATH="/etc/php/$PHPfv/apache2/php.ini"
 		PHP_EXT_PATH="/etc/php/$PHPfv/mods-available/"
 		PHP_EXT_LINK="/etc/php/$PHPfv/apache2/conf.d"
